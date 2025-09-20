@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Appetito.Infrastructure.Repositories;
 
-public sealed class UserRepository(AppetitoDbContext _context) : IUserRepository
+public sealed class UserRepository(AppetitoDbContext _context, IPasswordHasher _passwordHasher) : IUserRepository
 {
     public Task<User?> GetByIdAsync(Guid id)
     {
@@ -47,6 +47,8 @@ public sealed class UserRepository(AppetitoDbContext _context) : IUserRepository
         {
             if (user.Id == Guid.Empty)
                 user.Id = Guid.NewGuid();
+
+            user.PasswordHash = _passwordHasher.Hash(user.PasswordHash);
 
             _context.Users.Add(user);
 

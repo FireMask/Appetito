@@ -72,7 +72,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppetitoDbContext>();
     db.Database.Migrate();
-    await Appetito.Api.StartupData.EnsureSeedAsync(db);
+    await Appetito.Api.StartupData.EnsureSeedAsync(db, scope.ServiceProvider.GetRequiredService<IPasswordHasher>());
 }
 
 if (app.Environment.IsDevelopment())

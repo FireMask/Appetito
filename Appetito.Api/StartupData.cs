@@ -6,7 +6,7 @@ namespace Appetito.Api;
 
 public static class StartupData
 {
-    public static async Task EnsureSeedAsync(AppetitoDbContext db)
+    public static async Task EnsureSeedAsync(AppetitoDbContext db, IPasswordHasher _passwordHasher)
     {
         if (!await db.Units.AnyAsync())
         {
@@ -38,7 +38,7 @@ public static class StartupData
                 Id = Guid.NewGuid(),
                 HouseholdId = hh.Id,
                 Email = "admin@local",
-                PasswordHash = "admin", // TODO: replace with hash
+                PasswordHash = _passwordHasher.Hash("admin"),
                 IsActive = true
             };
             db.Households.Add(hh);
