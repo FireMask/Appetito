@@ -4,7 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Appetito.Infrastructure;
 using System.Text;
 using Appetito.Infrastructure.Repositories;
-using Appetito.Application.Abstractions;
+using Appetito.Application.Interfaces.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +19,10 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IItemRepository, ItemRepository>();
+builder.Services.AddScoped<IHouseholdRepository, HouseholdRepository>();
+builder.Services.AddScoped<IShoppingListRepository, ShoppingListRepository>();
+builder.Services.AddScoped<IShoppingListItemRepository, ShoppingListItemRepository>();
+builder.Services.AddScoped<IShoppingListService, ShoppingListService>();
 
 builder.Services.AddSingleton<IJwtProvider, JwtProvider>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();

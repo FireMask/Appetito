@@ -1,4 +1,4 @@
-using Appetito.Application.Abstractions;
+using Appetito.Application.Interfaces.Repositories;
 using Appetito.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,90 +6,60 @@ namespace Appetito.Infrastructure.Repositories;
 
 public sealed class UserRepository(AppetitoDbContext _context, IPasswordHasher _passwordHasher) : IUserRepository
 {
-    public Task<User?> GetByIdAsync(Guid id)
+    
+
+    public async Task<User?> GetById(Guid id, CancellationToken ct = default)
     {
-        try
-        {
-            if (id == Guid.Empty)
-                throw new ArgumentException("User must have a valid ID", nameof(id));
-            
-            return _context.Users.FirstOrDefaultAsync(u => u.Id == id);
-            
-        }catch(Exception ex)
-        {
-            return Task.FromException<User?>(ex);
-        }
+        return await _context.Users
+            .Where(u => u.Id == id)
+            .Include(u => u.Household)
+            .FirstOrDefaultAsync(ct);
     }
 
-     public Task<User?> GetByEmailAsync(string email)
+     public Task<User?> GetByEmail(string email, CancellationToken ct = default)
     {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(email))
-                throw new ArgumentException("Email must be provided", nameof(email));
-
-            return _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-        }
-        catch (Exception ex)
-        {
-            return Task.FromException<User?>(ex);
-        }
+        return _context.Users
+            .Where(u => u.Email == email)
+            .Include(u => u.Household)
+            .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<IEnumerable<User>> GetAllAsync()
+    public async Task<IEnumerable<User>> GetAll(CancellationToken ct = default)
     {
-        return await _context.Users.ToListAsync();
+        return await _context.Users
+            .Include(u => u.Household)
+            .ToListAsync(ct);
     }
 
-    public Task AddAsync(User user)
+    public Task Create(User user)
     {
-        try
-        {
-            if (user.Id == Guid.Empty)
-                user.Id = Guid.NewGuid();
-
-            user.PasswordHash = _passwordHasher.Hash(user.PasswordHash);
-
-            _context.Users.Add(user);
-
-            return Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            return Task.FromException(ex);
-        }
-    }
-
-    public Task DeleteAsync(Guid id)
-    {
-        if (id == Guid.Empty)
-            throw new ArgumentException("User must have a valid ID", nameof(id));
-
-        var user = new User { Id = id };
-        _context.Users.Remove(user);
-
+        user.PasswordHash = _passwordHasher.Hash(user.PasswordHash);
+        _context.Users.Add(user);
         return Task.CompletedTask;
     }
 
-    public Task UpdateAsync(User user)
+    public Task Update(User user)
+    {
+        _context.Users.Update(user);
+        return Task.CompletedTask;
+    }
+
+    public Task Delete(User user)
+    {
+        _context.Users.Remove(user);
+        return Task.CompletedTask;
+    }
+
+    public async Task<int> SaveChanges(CancellationToken ct = default)
     {
         try
         {
-            if (user.Id == Guid.Empty)
-                throw new ArgumentException("User must have a valid ID", nameof(user.Id));
-
-            _context.Users.Update(user);
-            
-            return Task.CompletedTask;
+            return await _context.SaveChangesAsync(ct);
         }
-        catch (Exception ex)
+        catch (DbUpdateException ex)
         {
-            return Task.FromException(ex);
+            Console.Error.WriteLine($"An error occurred while updating the database: {ex.Message}");
+            throw;
         }
-    }
-
-    public Task SaveChangesAsync(CancellationToken ct = default)
-    {
-        return _context.SaveChangesAsync(ct);
     }
 }

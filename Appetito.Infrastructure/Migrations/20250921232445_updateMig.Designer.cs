@@ -3,6 +3,7 @@ using System;
 using Appetito.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Appetito.Infrastructure.Migrations
 {
     [DbContext(typeof(AppetitoDbContext))]
-    partial class AppetitoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250921232445_updateMig")]
+    partial class updateMig
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -475,7 +478,7 @@ namespace Appetito.Infrastructure.Migrations
             modelBuilder.Entity("Appetito.Domain.Entities.User", b =>
                 {
                     b.HasOne("Appetito.Domain.Entities.Household", "Household")
-                        .WithMany("Members")
+                        .WithMany("Users")
                         .HasForeignKey("HouseholdId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -485,7 +488,7 @@ namespace Appetito.Infrastructure.Migrations
 
             modelBuilder.Entity("Appetito.Domain.Entities.Household", b =>
                 {
-                    b.Navigation("Members");
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("Appetito.Domain.Entities.ShoppingList", b =>

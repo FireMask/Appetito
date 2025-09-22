@@ -1,7 +1,6 @@
-// Pantry.Application/Auth/AuthService.cs
 using System.Security.Cryptography;
 using System.Text;
-using Appetito.Application.Abstractions;
+using Appetito.Application.Interfaces.Repositories;
 using Appetito.Domain.Entities;
 
 public sealed class AuthService(
@@ -12,7 +11,7 @@ public sealed class AuthService(
 {
     public async Task<AuthResult> LoginAsync(string email, string password, string ip, string ua, CancellationToken ct)
     {
-        var user = await users.GetByEmailAsync(email) ?? throw new UnauthorizedAccessException();
+        var user = await users.GetByEmail(email) ?? throw new UnauthorizedAccessException();
         if (!hasher.Verify(password, user.PasswordHash)) throw new UnauthorizedAccessException();
 
         var now = DateTime.UtcNow;
@@ -25,8 +24,8 @@ public sealed class AuthService(
             TokenHash = refreshHash, CreatedAt = now,
             ExpiresAt = now.AddDays(30), ClientIp = ip, UserAgent = ua
         };
-        await refreshRepo.AddAsync(token, ct);
-        await refreshRepo.SaveChangesAsync(ct);
+        await refreshRepo.Create(token);
+        await refreshRepo.SaveChanges(ct);
 
         return new AuthResult(access, refreshPlain);
     }
@@ -34,7 +33,7 @@ public sealed class AuthService(
     public async Task<AuthResult> RefreshAsync(string refreshPlain, string ip, string ua, CancellationToken ct)
     {
         var hash = Sha256(refreshPlain);
-        var token = await refreshRepo.FindActiveByHashAsync(hash, ct) ?? throw new UnauthorizedAccessException();
+        var token = await refreshRepo.GetByHash(hash, ct) ?? throw new UnauthorizedAccessException();
         if (token.ExpiresAt <= DateTime.UtcNow) throw new UnauthorizedAccessException();
 
         token.RevokedAt = DateTime.UtcNow; // rotate family
@@ -45,14 +44,42 @@ public sealed class AuthService(
 
         var newPlain = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
         var newHash  = Sha256(newPlain);
-        await refreshRepo.AddAsync(new RefreshToken {
-            Id = Guid.NewGuid(), UserId = user.Id,
-            TokenHash = newHash, CreatedAt = now, ExpiresAt = now.AddDays(30),
-            ClientIp = ip, UserAgent = ua
-        }, ct);
-        await refreshRepo.SaveChangesAsync(ct);
+
+        var newToken = new RefreshToken {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            TokenHash = newHash,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(30),
+            ClientIp = ip,
+            UserAgent = ua
+        };
+
+        await refreshRepo.Create(newToken);
+        await refreshRepo.SaveChanges(ct);
 
         return new AuthResult(access, newPlain);
+    }
+
+    public async Task<AuthResult> RegisterAsync(string email, string password, string ip, string ua, CancellationToken ct)
+    {
+        var existingUser = await users.GetByEmail(email);
+        if (existingUser != null)
+            throw new InvalidOperationException("User with this email already exists.");
+
+        var passwordHash = hasher.Hash(password);
+        var newUser = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            PasswordHash = passwordHash
+        };
+
+        await users.Create(newUser);
+        await users.SaveChanges(ct);
+
+        // Automatically log in the user after registration
+        return await LoginAsync(email, password, ip, ua, ct);
     }
 
     static string Sha256(string s)
@@ -60,11 +87,5 @@ public sealed class AuthService(
         using var sha = SHA256.Create();
         return Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(s)));
     }
-}
-
-public interface IAuthService
-{
-    Task<AuthResult> LoginAsync(string email, string password, string ip, string ua, CancellationToken ct);
-    Task<AuthResult> RefreshAsync(string refreshToken, string ip, string ua, CancellationToken ct);
 }
 public record AuthResult(string AccessToken, string RefreshToken);

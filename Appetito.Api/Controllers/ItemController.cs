@@ -1,14 +1,14 @@
-using Appetito.Application.Abstractions;
+using Appetito.Application.Interfaces.Repositories;
 using Appetito.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Pantry.Api.Controllers;
+namespace Appetito.Api.Controllers;
 
 [ApiController]
-[Route("api/items")]
+[Route("api/[controller]")]
 [Authorize]
-public sealed class ItemsController(IItemRepository items) : ControllerBase
+public sealed class ItemsController(IItemRepository _items) : ControllerBase
 {
     private Guid HouseholdId =>
         Guid.TryParse(User.FindFirst("householdId")?.Value, out var id) ? id
@@ -18,20 +18,38 @@ public sealed class ItemsController(IItemRepository items) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? search, CancellationToken ct)
     {
-        var list = await items.ListAsync(HouseholdId, search, ct);
+        var list = await _items.GetAll(HouseholdId, search, ct);
         var result = list.Select(i => new ItemSummaryDto(
-            i.Id, i.Name, i.ReorderPoint, i.TargetQty, i.ShelfLifeDays, i.IsActive));
+            i.Id,
+            i.Name,
+            i.ReorderPoint,
+            i.TargetQty,
+            i.ShelfLifeDays,
+            i.IsActive)
+        );
         return Ok(result);
     }
     // GET /api/items/{id}
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
-        var item = await items.GetAsync(id, HouseholdId, ct);
-        if (item is null) return NotFound();
-        return Ok(new ItemDetailDto(
-            item.Id, item.HouseholdId, item.Name, item.CategoryId, item.DefaultUnitId,
-            item.ReorderPoint, item.TargetQty, item.ShelfLifeDays, item.IsActive, item.Notes));
+        var item = await _items.GetById(id, HouseholdId, ct);
+        if (item is null)
+            return NotFound();
+        return Ok(
+            new ItemDetailDto(
+                item.Id,
+                item.HouseholdId,
+                item.Name,
+                item.CategoryId,
+                item.DefaultUnitId,
+                item.ReorderPoint,
+                item.TargetQty,
+                item.ShelfLifeDays,
+                item.IsActive,
+                item.Notes
+            )
+        );
     }
 
     // POST /api/items
@@ -57,8 +75,8 @@ public sealed class ItemsController(IItemRepository items) : ControllerBase
             IsActive = true
         };
 
-        await items.AddAsync(entity, ct);
-        await items.SaveChangesAsync(ct);
+        await _items.Create(entity);
+        await _items.SaveChanges(ct);
 
         return CreatedAtAction(nameof(GetById), new { id = entity.Id }, new { entity.Id });
     }
@@ -67,7 +85,7 @@ public sealed class ItemsController(IItemRepository items) : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] ItemUpdateDto dto, CancellationToken ct)
     {
-        var entity = await items.GetAsync(id, HouseholdId, ct);
+        var entity = await _items.GetById(id, HouseholdId, ct);
         if (entity is null) return NotFound();
 
         if (string.IsNullOrWhiteSpace(dto.Name))
@@ -83,7 +101,7 @@ public sealed class ItemsController(IItemRepository items) : ControllerBase
         entity.ShelfLifeDays = dto.ShelfLifeDays;
         entity.Notes = dto.Notes;
 
-        await items.SaveChangesAsync(ct);
+        await _items.SaveChanges(ct);
         return NoContent();
     }
 
@@ -91,13 +109,13 @@ public sealed class ItemsController(IItemRepository items) : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> SoftDelete(Guid id, CancellationToken ct)
     {
-        var entity = await items.GetAsync(id, HouseholdId, ct);
+        var entity = await _items.GetById(id, HouseholdId, ct);
         if (entity is null) return NotFound();
 
         if (!entity.IsActive) return NoContent(); // already deleted
         entity.IsActive = false;
 
-        await items.SaveChangesAsync(ct);
+        await _items.SaveChanges(ct);
         return NoContent();
     }
 }
